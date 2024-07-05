@@ -21,7 +21,7 @@ $manifest = array(
     'name' => 'Lead Conversion for SugarCRM',
     'published_date' => '2024-07-04 21:24:17',
     'type' => 'module',
-    'version' => '202407041',
+    'version' => '202407043',
     'remove_tables' => false,
 );
 

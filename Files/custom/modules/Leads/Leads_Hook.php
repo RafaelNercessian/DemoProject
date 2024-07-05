@@ -10,109 +10,128 @@ class Leads_Hook
 
     public function leadConversionOptions($bean, $event, $arguments)
     {
-        if (empty($bean->leadConversionOptionsSet) && !empty($bean->convert_lead_c)) {
-            $GLOBALS['log']->fatal("Inside Leads_Hook convertLeads");
+        if (empty($bean->leadConversionOptionsSet) && !empty($bean->convert_lead_c) && empty($bean->converted)) {
+            $GLOBALS['log']->debug("Inside Leads_Hook leadConversionOptions");
             $bean->leadConversionOptionsSet = true;
-            global $sugar_config;
-            if ($sugar_config['lead_conv_activity_opt'] != 'donothing') {
-                $configuratorObj = new Configurator();
-                $configuratorObj->loadConfig();
-                $configuratorObj->config['lead_conv_activity_opt'] = "donothing";
-                $configuratorObj->saveConfig();
-            }
+            $this->updateLeadConversionConfig();
+        }
+    }
+
+    private function updateLeadConversionConfig()
+    {
+        global $sugar_config;
+        if ($sugar_config['lead_conv_activity_opt'] != 'donothing') {
+            $configurator = new Configurator();
+            $configurator->loadConfig();
+            $configurator->config['lead_conv_activity_opt'] = "donothing";
+            $configurator->saveConfig();
         }
     }
 
     public function convertLeads($bean, $event, $arguments)
     {
-        if (empty($bean->leadConverted) && !empty($bean->convert_lead_c)) {
-            $GLOBALS['log']->fatal("Inside Leads_Hook convertLeads");
+        if (empty($bean->leadConverted) && !empty($bean->convert_lead_c) && empty($bean->converted)) {
+            $GLOBALS['log']->debug("Inside Leads_Hook leadConverted");
             $bean->leadConverted = true;
-            $bean->converted = true;
             $bean->status = self::CONVERTED;
             $bean->date_converted = TimeDate::getInstance()->nowDb();
-            $bean->save();
         }
     }
 
     public function createAccount($bean, $event, $arguments)
     {
-        if (empty($bean->accountCreated) && !empty($bean->convert_lead_c)) {
-            $GLOBALS['log']->fatal("Inside Leads_Hook createAccount");
+        if (empty($bean->accountCreated) && !empty($bean->convert_lead_c) && empty($bean->converted)) {
+            $GLOBALS['log']->debug("Inside Leads_Hook createAccount");
             $bean->accountCreated = true;
-            $sugarQuery = new SugarQuery();
-            $sugarQuery->from(BeanFactory::newBean('Accounts'));
-            $sugarQuery->select(array('id'));
-            $sugarQuery->where()->equals("name", $bean->name);
-            $GLOBALS['log']->fatal("Found account query: " . $sugarQuery->compile());
-            $existingAccount = $sugarQuery->getOne();
+            $existingAccount = $this->findExistingAccount($bean->name);
             if (empty($existingAccount)) {
-                $accountsBean = BeanFactory::newBean('Accounts');
-                $accountsBean->name = $bean->name;
-                $accountsBean->billing_address_street = $bean->primary_address_street;
-                $accountsBean->billing_address_city = $bean->primary_address_city;
-                $accountsBean->billing_address_state = $bean->primary_address_state;
-                $accountsBean->billing_address_postalcode = $bean->primary_address_postalcode;
-                $accountsBean->shipping_address_street = $bean->primary_address_street;
-                $accountsBean->shipping_address_city = $bean->primary_address_city;
-                $accountsBean->shipping_address_state = $bean->primary_address_state;
-                $accountsBean->shipping_address_postalcode = $bean->primary_address_postalcode;
-                $accountsBean->shipping_address_country = $bean->primary_address_country;
-                $bean->account = $accountsBean->save();
-                $GLOBALS['log']->fatal("Account Id: " . print_r($bean->account->id, 1));
+                $account = BeanFactory::newBean('Accounts');
+                $account->name = $bean->name;
+                $this->copyAddressToAccount($bean, $account);
+                $bean->account = $account->save();
+                $GLOBALS['log']->debug("Account id: " . print_r($bean->account->id, 1));
             }
+        }
+    }
+
+    private function findExistingAccount($name)
+    {
+        $sugarQuery = new SugarQuery();
+        $sugarQuery->from(BeanFactory::newBean('Accounts'));
+        $sugarQuery->select(array('id'));
+        $sugarQuery->where()->equals("name", $name);
+        return $sugarQuery->getOne();
+    }
+
+    private function copyAddressToAccount($from, $to)
+    {
+        $addressFields = ['street', 'city', 'state', 'postalcode', 'country'];
+        foreach ($addressFields as $field) {
+            $billingField = "billing_address_" . $field;
+            $shippingField = "shipping_address_" . $field;
+            $primaryField = "primary_address_" . $field;
+
+            $to->$billingField = $from->$primaryField;
+            $to->$shippingField = $from->$primaryField;
         }
     }
 
     public function createContact($bean, $event, $arguments)
     {
-        if (empty($bean->contactCreated) && !empty($bean->convert_lead_c)) {
-            $GLOBALS['log']->fatal("Inside Leads_Hook contactCreated");
+        if (empty($bean->contactCreated) && !empty($bean->convert_lead_c) && empty($bean->converted)) {
+            $GLOBALS['log']->debug("Inside Leads_Hook createContact");
             $bean->contactCreated = true;
-            $sugarQuery = new SugarQuery();
-            $sugarQuery->from(BeanFactory::newBean('Contacts'));
-            $sugarQuery->select(array('id'));
-            $sugarQuery->where()->equals("first_name", $bean->first_name)->queryAnd()->equals("last_name", $bean->last_name);
-            $GLOBALS['log']->fatal("Found contact query: " . $sugarQuery->compile());
-            $existingContact = $sugarQuery->getOne();
+            $existingContact = $this->findExistingContact($bean->first_name, $bean->last_name);
             if (empty($existingContact)) {
-                $contactsBean = BeanFactory::newBean('Contacts');
-                $contactsBean->name = $bean->first_name . ' ' . $bean->last_name;
-                $contactsBean->first_name = $bean->first_name;
-                $contactsBean->last_name = $bean->last_name;
-                if (!empty($bean->email1)) {
-                    $contactsBean->email1 = $bean->email1;
-                } elseif (!empty($bean->emailAddress)) {
-                    $emailAddresses = $bean->emailAddress->getAddresses();
-                    if (!empty($emailAddresses[0]['email_address'])) {
-                        $contactsBean->email1 = $emailAddresses[0]['email_address'];
-                    }
-                }
-                $bean->contactId = $contactsBean->save();
-                $GLOBALS['log']->fatal("Contact Id: " . print_r($bean->contactId, 1));
+                $contact = BeanFactory::newBean('Contacts');
+                $contact->name = $bean->first_name . ' ' . $bean->last_name;
+                $contact->first_name = $bean->first_name;
+                $contact->last_name = $bean->last_name;
+                $contact->email1 = $this->getLeadEmail($bean);
+                $bean->contactId = $contact->save();
+                $GLOBALS['log']->debug("Contact id: " . print_r($bean->contactId, 1));
             }
         }
     }
 
+    private function findExistingContact($firstName, $lastName)
+    {
+        $sugarQuery = new SugarQuery();
+        $sugarQuery->from(BeanFactory::newBean('Contacts'));
+        $sugarQuery->select(array('id'));
+        $sugarQuery->where()->equals("first_name", $firstName)->queryAnd()->equals("last_name", $lastName);
+        return $sugarQuery->getOne();
+    }
+
+    private function getLeadEmail($bean)
+    {
+        if (!empty($bean->email1)) {
+            return $bean->email1;
+        } elseif (!empty($bean->emailAddress)) {
+            $emailAddresses = $bean->emailAddress->getAddresses();
+            return !empty($emailAddresses[0]['email_address']) ? $emailAddresses[0]['email_address'] : '';
+        }
+        return '';
+    }
+
     public function createOpportunity($bean, $event, $arguments)
     {
-        if (empty($bean->opportunityCreated) && !empty($bean->convert_lead_c)) {
+        if (empty($bean->opportunityCreated) && !empty($bean->convert_lead_c) && empty($bean->converted)) {
+            $GLOBALS['log']->debug("Inside Leads_Hook createOpportunity");
             $bean->opportunityCreated = true;
-            $GLOBALS['log']->fatal("Inside Leads_Hook createOpportunity");
-            $opportunityBean = BeanFactory::newBean('Opportunities');
-            $opportunityBean->name = $bean->first_name . ' ' . $bean->last_name . " - " . date("Y-m-d");
-            $opportunityBean->sales_stage = 'Prospecting';  // Set an initial sales stage
-            $opportunityBean->lead_source = $bean->lead_source;
-            $opportunityBean->description = $bean->description;
-            $bean->opportunityId = $opportunityBean->save();
-            $GLOBALS['log']->fatal("Opportunity Id: " . print_r($bean->opportunityId, 1));
-
+            $opportunity = BeanFactory::newBean('Opportunities');
+            $opportunity->name = $bean->first_name . ' ' . $bean->last_name . " - " . date("Y-m-d");
+            $opportunity->sales_stage = 'Prospecting';
+            $opportunity->lead_source = $bean->lead_source;
+            $opportunity->description = $bean->description;
+            $bean->opportunityId = $opportunity->save();
+            $GLOBALS['log']->debug("Opportunity id: " . print_r($bean->opportunityId, 1));
         }
     }
 
     public function createRelationships($bean)
     {
-        if (empty($bean->createRelationship)) {
+        if (empty($bean->createRelationship) && !empty($bean->convert_lead_c) && empty($bean->converted)) {
             $bean->createRelationship = true;
             // Lead -> Account, Contact, Opportunity
             $bean->load_relationship('accounts');
@@ -142,8 +161,8 @@ class Leads_Hook
             $opportunity->accounts->add($bean->account->id);
             $opportunity->load_relationship('contacts');
             $opportunity->contacts->add($bean->contactId);
+            $bean->converted = true;
+            $bean->save();
         }
     }
 }
-
-
