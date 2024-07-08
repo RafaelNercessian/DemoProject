@@ -21,7 +21,7 @@ $manifest = array(
     'name' => 'Lead Conversion for SugarCRM',
     'published_date' => '2024-07-04 21:24:17',
     'type' => 'module',
-    'version' => '202407043',
+    'version' => '202407045',
     'remove_tables' => false,
 );
 
@@ -55,10 +55,17 @@ $installdefs = array(
             'ext4' => '',
         )
     ),
+    'language' => array(
+        array(
+            'from' => '<basepath>/Files/Language/Leads/en_us.lang.php',
+            'to_module' => 'Leads',
+            'language' => 'en_us'
+        ),
+    ),
     'logic_hooks' => array(
         array(
             'module' => 'Leads',
-            'hook' => 'after_save',
+            'hook' => 'before_save',
             'order' => 1,
             'description' => 'Check Lead Conversion Options',
             'file' => 'custom/modules/Leads/Leads_Hook.php',
@@ -68,7 +75,7 @@ $installdefs = array(
         array(
             'module' => 'Leads',
             'hook' => 'after_save',
-            'order' => 2,
+            'order' => 1,
             'description' => 'Convert Leads',
             'file' => 'custom/modules/Leads/Leads_Hook.php',
             'class' => 'Leads_Hook',
@@ -77,7 +84,7 @@ $installdefs = array(
         array(
             'module' => 'Leads',
             'hook' => 'after_save',
-            'order' => 3,
+            'order' => 2,
             'description' => 'Create Account',
             'file' => 'custom/modules/Leads/Leads_Hook.php',
             'class' => 'Leads_Hook',
@@ -86,7 +93,7 @@ $installdefs = array(
         array(
             'module' => 'Leads',
             'hook' => 'after_save',
-            'order' => 4,
+            'order' => 3,
             'description' => 'Create Contact',
             'file' => 'custom/modules/Leads/Leads_Hook.php',
             'class' => 'Leads_Hook',
@@ -95,7 +102,7 @@ $installdefs = array(
         array(
             'module' => 'Leads',
             'hook' => 'after_save',
-            'order' => 5,
+            'order' => 4,
             'description' => 'Create Opportunity',
             'file' => 'custom/modules/Leads/Leads_Hook.php',
             'class' => 'Leads_Hook',
@@ -104,7 +111,7 @@ $installdefs = array(
         array(
             'module' => 'Leads',
             'hook' => 'after_save',
-            'order' => 6,
+            'order' => 5,
             'description' => 'Create Relationship',
             'file' => 'custom/modules/Leads/Leads_Hook.php',
             'class' => 'Leads_Hook',
